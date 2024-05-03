@@ -55,7 +55,7 @@ describe("MetaXSeed Contract", function () {
         });
 
         it("should fail to mint beyond max supply", async function () {
-            for (let i = 1; i <= 10; i++) {
+            for (let i = 1; i <= 11; i++) {
                 await metaXSeed.safeMint(i, addr1.address, `uri${i}`, true);
             }
             await expect(metaXSeed.safeMint(11, addr1.address, "uri11", true)).to.be.revertedWith("Max supply reached");

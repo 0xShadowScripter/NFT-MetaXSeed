@@ -36,11 +36,17 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     /// @dev Constant for a week's worth of seconds (used for time calculations)
     uint32 private constant WEEK = 3600 * 24 * 7;
 
-    /// @dev Domain name used for EIP-712 typed data signing
-    string private constant SIGNING_DOMAIN = "MetaXSeeds";
+    /// @dev to get owned Token Indexes
+    mapping(uint256 => uint256) private _ownedTokensIndex;
+
+    /// @dev to get owned Token
+    mapping(address => uint256[]) private _ownedTokens;
 
     /// @dev Version of the EIP-712 domain
     string private constant SIGNATURE_VERSION = "1";
+
+    /// @dev Domain name used for EIP-712 typed data signing
+    string private constant SIGNING_DOMAIN = "MetaXSeeds";
 
     /// @dev Hash of the type for the EIP-712 typed data signature for lazy minting
     bytes32 private constant LAZY_MINT_TYPEHASH =
@@ -94,11 +100,12 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         string memory tokenURI,
         bool transferable
     ) public onlyOwner {
-        require(tokenIdCounter.current() < maxSupply, "Max supply reached");
+        require(tokenIdCounter.current() <= maxSupply, "Max supply reached");
         tokenIdCounter.increment();
         transferableTokens[tokenId] = transferable;
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
+        _addTokenToOwnerEnumeration(to, tokenId);
     }
 
     /// @notice Mints multiple tokens in a batch with specific properties and unique token IDs
@@ -121,7 +128,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
         // Ensure minting this batch won't exceed the max supply
         require(
-            tokenIdCounter.current() + tokenIds.length < maxSupply,
+            tokenIdCounter.current() + tokenIds.length <= maxSupply,
             "Batch mint would exceed max supply"
         );
 
@@ -130,6 +137,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
             transferableTokens[tokenIds[i]] = transferables[i];
             _safeMint(to, tokenIds[i]);
             _setTokenURI(tokenIds[i], tokenURIs[i]);
+            _addTokenToOwnerEnumeration(to, tokenIds[i]);
             // Manually increment the tokenIdCounter after each mint
             tokenIdCounter.increment();
         }
@@ -152,7 +160,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         bytes memory signature,
         uint256 expiry
     ) public {
-        require(tokenIdCounter.current() < maxSupply, "Max supply reached");
+        require(tokenIdCounter.current() <= maxSupply, "Max supply reached");
         require(expiry <= block.timestamp + WEEK, "Signature has expired");
         require(!usedSalts[salt], "Salt has already been used");
         usedSalts[salt] = true;
@@ -178,6 +186,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         transferableTokens[tokenId] = transferable;
         _safeMint(to, tokenId); // mint to the specified 'to' address
         _setTokenURI(tokenId, tokenURI);
+        _addTokenToOwnerEnumeration(to, tokenId);
     }
 
     /// @notice Burns a token and decrements the token counter
@@ -187,16 +196,23 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "Caller is not owner nor approved"
         );
+
+        address owner = ownerOf(tokenId);
+
+        // Correctly remove the token
         _burn(tokenId);
 
-        // Decrement the token counter if the token exists and has been successfully burned
+        // Decrement the token counter if it's necessary for your logic (not standard in ERC721)
+        // This assumes you want to keep track of the "active" supply, not just total minted ever
         if (tokenIdCounter.current() > 0) {
             tokenIdCounter.decrement();
         }
 
-        // Optionally, clean up any data related to the token
+        // Clean up any additional data related to the token
         delete transferableTokens[tokenId];
-        // Note: `_burn` will also clean up the owner and approval mappings in ERC721
+
+        // Remove from owner enumeration
+        _removeTokenFromOwnerEnumeration(owner, tokenId);
     }
 
     /// @notice Sets or updates the URI for a given token
@@ -243,6 +259,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     ) internal override {
         require(transferableTokens[tokenId], "Token is not transferable");
         super._transfer(from, to, tokenId);
+        _removeTokenFromOwnerEnumeration(from, tokenId);
+        _addTokenToOwnerEnumeration(to, tokenId);
     }
 
     /// @notice Verifies the signature of a minting request for migration purposes
@@ -280,5 +298,38 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         signer = digest.recover(signature);
 
         return (digest, signer);
+    }
+
+    /// @notice Gets the list of token IDs owned by a given address
+    /// @param owner The owner whose tokens we are interested in
+    /// @return A list of token IDs owned by the address
+    function tokensOfOwner(address owner)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        return _ownedTokens[owner];
+    }
+
+    function _addTokenToOwnerEnumeration(address to, uint256 tokenId) private {
+        _ownedTokensIndex[tokenId] = _ownedTokens[to].length;
+        _ownedTokens[to].push(tokenId);
+    }
+
+    function _removeTokenFromOwnerEnumeration(address from, uint256 tokenId)
+        private
+    {
+        uint256 lastTokenIndex = _ownedTokens[from].length - 1;
+        uint256 tokenIndex = _ownedTokensIndex[tokenId];
+
+        if (tokenIndex != lastTokenIndex) {
+            uint256 lastTokenId = _ownedTokens[from][lastTokenIndex];
+
+            _ownedTokens[from][tokenIndex] = lastTokenId; // Move the last token to the slot of the to-be-removed token
+            _ownedTokensIndex[lastTokenId] = tokenIndex; // Update the moved token's index
+        }
+
+        _ownedTokens[from].pop();
+        delete _ownedTokensIndex[tokenId];
     }
 }

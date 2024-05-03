@@ -14,14 +14,15 @@ describe("MetaXSeed Contract - Burn Functionality", function () {
         // Mint a token first
         await metaXSeed.safeMint(1, owner.address, "tokenURI1", true);
         expect(await metaXSeed.totalSupply()).to.equal(1);
-
+    
         // Burn the token
         await metaXSeed.burn(1);
         expect(await metaXSeed.totalSupply()).to.equal(0);
-
+    
         // Check that the token no longer exists
         await expect(metaXSeed.ownerOf(1)).to.be.revertedWith("ERC721: owner query for nonexistent token");
     });
+    
 
     it("should prevent unauthorized users from burning a token", async function () {
         // Mint a token to the owner
