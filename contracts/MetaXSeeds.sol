@@ -311,11 +311,17 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         return _ownedTokens[owner];
     }
 
+    /// @dev Adds a token to the enumeration of owned tokens for a specific address
+    /// @param to The address to which the token is being transferred
+    /// @param tokenId The ID of the token being added
     function _addTokenToOwnerEnumeration(address to, uint256 tokenId) private {
         _ownedTokensIndex[tokenId] = _ownedTokens[to].length;
         _ownedTokens[to].push(tokenId);
     }
 
+    /// @dev Removes a token from the owner enumeration when transferred or burned
+    /// @param from The address from which the token is being removed
+    /// @param tokenId The ID of the token being removed
     function _removeTokenFromOwnerEnumeration(address from, uint256 tokenId)
         private
     {
