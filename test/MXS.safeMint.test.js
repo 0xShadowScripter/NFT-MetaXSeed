@@ -72,5 +72,26 @@ describe("MetaXSeed Contract", function () {
             await expect(metaXSeed.safeMintBatch(addr1.address, tokenIds, tokenURIs, transferables)).to.be.revertedWith("Batch mint would exceed max supply");
 
         });
+        it("should allow the owner to update the token URI", async function () {
+          const tokenId = 1;
+          const initialURI = "https://example.com/original";
+          const newURI = "https://example.com/updated";
+  
+          await metaXSeed.safeMint(tokenId, owner.address, initialURI, true);
+          expect(await metaXSeed.tokenURI(tokenId)).to.equal(initialURI);
+  
+          await metaXSeed.setTokenURI(tokenId, newURI);
+          expect(await metaXSeed.tokenURI(tokenId)).to.equal(newURI);
+      });
+  
+      it("should prevent non-owners from updating the token URI", async function () {
+          const tokenId = 1;
+          const initialURI = "https://example.com/original";
+          const newURI = "https://example.com/updated";
+  
+          await metaXSeed.safeMint(tokenId, owner.address, initialURI, true);
+          await expect(metaXSeed.connect(addr1).setTokenURI(tokenId, newURI))
+              .to.be.revertedWith("Ownable: caller is not the owner");
+      });
     });
   });

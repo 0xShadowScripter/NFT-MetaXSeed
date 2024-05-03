@@ -199,6 +199,21 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         // Note: `_burn` will also clean up the owner and approval mappings in ERC721
     }
 
+    /// @notice Sets or updates the URI for a given token
+    /// @dev This function can only be called by the contract owner
+    /// @param tokenId The token ID for which to set the URI
+    /// @param newTokenURI The new URI to set for the token
+    function setTokenURI(uint256 tokenId, string memory newTokenURI)
+        public
+        onlyOwner
+    {
+        require(
+            _exists(tokenId),
+            "ERC721Metadata: URI set of nonexistent token"
+        );
+        _setTokenURI(tokenId, newTokenURI);
+    }
+
     /// @notice Sets the transferability status of a specific token
     /// @dev Only callable by the owner of the contract
     /// @param tokenId The ID of the token to update
