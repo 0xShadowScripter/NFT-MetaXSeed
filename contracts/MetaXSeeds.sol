@@ -10,9 +10,6 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 /// @title A contract for minting unique digital assets on the Ethereum blockchain
 /// @dev Extends ERC721URIStorage for token URI storage capabilities
 contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
-    // global token transferability
-    bool public globalTransferable;
-
     // Use library `Counters` for safe counter operations
     using Counters for Counters.Counter;
     // Use library `ECDSA` for operations on `bytes32` related to ECDSA signatures
@@ -23,6 +20,9 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
     /// @notice Maximum number of tokens that can be minted
     uint256 public maxSupply;
+
+    // global token transferability
+    bool public globalTransferable;
 
     // Event for minting a new token
     event TokenMinted(
