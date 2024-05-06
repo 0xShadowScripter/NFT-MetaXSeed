@@ -18,12 +18,77 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     /// @dev Counter for tracking token IDs
     Counters.Counter private tokenIdCounter;
 
-    /// @notice Address where collected fees are sent
-    address public feeCollector;
-
     /// @notice Maximum number of tokens that can be minted
     uint256 public maxSupply;
+    
+    // Event for minting a new token
+    event TokenMinted(
+        address indexed owner,
+        uint256 indexed tokenId,
+        string tokenURI,
+        bool transferable
+    );
 
+    // Event for adding a new signer
+    event SignerAdded(address indexed signer);
+
+    // Event for removing a signer
+    event SignerRemoved(address indexed signer);
+
+    // Event for lazy minting
+    event LazyMinted(
+        address indexed to,
+        uint256 indexed tokenId,
+        bool transferable,
+        bytes32 salt,
+        string tokenURI,
+        bytes signature,
+        uint256 expiry
+    );
+
+    // Event for burning a token
+    event TokenBurned(address indexed owner, uint256 indexed tokenId);
+
+    // Event for updating token URI
+    event TokenURIUpdated(uint256 indexed tokenId, string newTokenURI);
+
+    // Event for updating token transferability
+    event TokenTransferabilityUpdated(
+        uint256 indexed tokenId,
+        bool transferable
+    );
+
+    // Event for batch Lazy minting
+    event BatchLazyMinted(
+        address indexed to,
+        uint256[] tokenIds,
+        string[] tokenURIs,
+        bool[] transferables,
+        bytes32[] salts,
+        bytes[] signatures,
+        uint256[] expiries
+    );
+
+      // Event for batch minting
+    event BatchMinted(
+        address indexed to,
+        uint256[] tokenIds,
+        string[] tokenURIs,
+        bool[] transferables
+    );
+
+
+    /// @dev Version of the EIP-712 domain
+    string private constant SIGNATURE_VERSION = "1";
+
+    /// @dev Domain name used for EIP-712 typed data signing
+    string private constant SIGNING_DOMAIN = "MetaXSeeds";
+
+    /// @dev Hash of the type for the EIP-712 typed data signature for lazy minting
+    bytes32 private constant LAZY_MINT_TYPEHASH =
+        keccak256(
+            "LazyMint(address to,uint256 tokenId,bool transferable,bytes32 salt,string tokenURI,uint256 expiry)"
+        );
     /// @notice Mapping from token ID to its transferability status
     mapping(uint256 => bool) public transferableTokens;
 
@@ -42,33 +107,19 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     /// @dev to get owned Token
     mapping(address => uint256[]) private _ownedTokens;
 
-    /// @dev Version of the EIP-712 domain
-    string private constant SIGNATURE_VERSION = "1";
-
-    /// @dev Domain name used for EIP-712 typed data signing
-    string private constant SIGNING_DOMAIN = "MetaXSeeds";
-
-    /// @dev Hash of the type for the EIP-712 typed data signature for lazy minting
-    bytes32 private constant LAZY_MINT_TYPEHASH =
-        keccak256(
-            "LazyMint(address to,uint256 tokenId,bool transferable,bytes32 salt,string tokenURI,uint256 expiry)"
-        );
 
     /// @notice Constructor to create MetaXSeed
     /// @param name Name of the token
     /// @param symbol Symbol of the token
     /// @param signerAddress Initial address that is authorized to sign minting requests
-    /// @param feeCollectorAddress Address where minting fees will be sent
     /// @param _maxSupply Initial maximum supply of tokens
     constructor(
         string memory name,
         string memory symbol,
         address signerAddress,
-        address feeCollectorAddress,
         uint256 _maxSupply
     ) ERC721(name, symbol) EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
         signers[signerAddress] = true;
-        feeCollector = feeCollectorAddress;
         maxSupply = _maxSupply; // Set the maximum supply
     }
 
@@ -78,6 +129,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     function addSigner(address _signer) public onlyOwner {
         require(_signer != address(0), "Bad signer");
         signers[_signer] = true;
+        emit SignerAdded(_signer);
     }
 
     /// @notice Removes a signer from the list of authorized signers
@@ -86,6 +138,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     function removeSigner(address _signer) external onlyOwner {
         require(_signer != address(0), "Bad signer");
         delete signers[_signer];
+        emit SignerRemoved(_signer);
     }
 
     /// @notice Mints a new token with specific properties
@@ -100,12 +153,14 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         string memory tokenURI,
         bool transferable
     ) public onlyOwner {
+        require(!_exists(tokenId), "Token ID already exists");
         require(tokenIdCounter.current() <= maxSupply, "Max supply reached");
         tokenIdCounter.increment();
         transferableTokens[tokenId] = transferable;
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
         _addTokenToOwnerEnumeration(to, tokenId);
+        emit TokenMinted(to, tokenId, tokenURI, transferable);
     }
 
     /// @notice Mints multiple tokens in a batch with specific properties and unique token IDs
@@ -141,6 +196,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
             // Manually increment the tokenIdCounter after each mint
             tokenIdCounter.increment();
         }
+
+        emit BatchMinted(to, tokenIds, tokenURIs, transferables);
     }
 
     /// @notice Lazily mints a token after verifying the signature
@@ -160,10 +217,10 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         bytes memory signature,
         uint256 expiry
     ) public {
+        require(!_exists(tokenId), "Token ID already exists");
         require(tokenIdCounter.current() <= maxSupply, "Max supply reached");
         require(expiry <= block.timestamp + WEEK, "Signature has expired");
         require(!usedSalts[salt], "Salt has already been used");
-        usedSalts[salt] = true;
 
         bytes32 structHash = keccak256(
             abi.encode(
@@ -181,12 +238,60 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
         require(signer != address(0), "Invalid signature");
         require(signers[signer], "Invalid signer");
+        usedSalts[salt] = true;
+
 
         tokenIdCounter.increment();
         transferableTokens[tokenId] = transferable;
         _safeMint(to, tokenId); // mint to the specified 'to' address
         _setTokenURI(tokenId, tokenURI);
         _addTokenToOwnerEnumeration(to, tokenId);
+        
+
+       emit  LazyMinted(to, tokenId, transferable, salt, tokenURI, signature, expiry);
+    }
+
+    /// @notice Lazily mints multiple tokens after verifying the signatures for each token
+    /// @param to The recipient of the tokens
+    /// @param tokenIds An array of token IDs to mint
+    /// @param transferables An array indicating whether each token is transferable
+    /// @param salts An array of unique salts to prevent replay attacks
+    /// @param tokenURIs An array of URIs for the token metadata
+    /// @param signatures An array of signatures to verify
+    /// @param expiries An array of timestamps after which each signature expires
+    function batchLazyMint(
+        address to,
+        uint256[] memory tokenIds,
+        bool[] memory transferables,
+        bytes32[] memory salts,
+        string[] memory tokenURIs,
+        bytes[] memory signatures,
+        uint256[] memory expiries
+    ) public onlyOwner {
+        require(
+            tokenIds.length == transferables.length &&
+                transferables.length == salts.length &&
+                salts.length == tokenURIs.length &&
+                tokenURIs.length == signatures.length &&
+                signatures.length == expiries.length,
+            "Array lengths must match"
+        );
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            require(!_exists(tokenIds[i]), "Token ID already exists");
+
+            lazyMint(
+                to,
+                tokenIds[i],
+                transferables[i],
+                salts[i],
+                tokenURIs[i],
+                signatures[i],
+                expiries[i]
+            );
+        }
+
+        emit BatchLazyMinted(to, tokenIds, tokenURIs, transferables, salts, signatures, expiries);
     }
 
     /// @notice Burns a token and decrements the token counter
@@ -213,6 +318,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
         // Remove from owner enumeration
         _removeTokenFromOwnerEnumeration(owner, tokenId);
+
+        emit TokenBurned(owner, tokenId);
     }
 
     /// @notice Sets or updates the URI for a given token
@@ -228,6 +335,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
             "ERC721Metadata: URI set of nonexistent token"
         );
         _setTokenURI(tokenId, newTokenURI);
+
+        emit TokenURIUpdated(tokenId, newTokenURI);
     }
 
     /// @notice Sets the transferability status of a specific token
@@ -240,6 +349,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     {
         require(_exists(tokenId), "Token does not exist");
         transferableTokens[tokenId] = transferable;
+
+        emit TokenTransferabilityUpdated(tokenId, transferable);
     }
 
     /// @notice Retrieves the current total supply of tokens

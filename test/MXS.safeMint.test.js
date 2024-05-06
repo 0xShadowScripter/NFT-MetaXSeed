@@ -8,13 +8,10 @@ describe("MetaXSeed Contract", function () {
         MetaXSeed = await ethers.getContractFactory("MetaXSeed");
         [owner, addr1, addr2] = await ethers.getSigners();
         // Deploy with a max supply of 10 for testing
-        metaXSeed = await MetaXSeed.deploy("MetaXSeed", "MTX", owner.address, owner.address, 10);
+        metaXSeed = await MetaXSeed.deploy("MetaXSeed", "MTX", owner.address, 10);
     });
 
     describe("Ownership and Access Control Tests", function() {
-        it("should set initial owner and fee collector", async function () {
-            expect(await metaXSeed.feeCollector()).to.equal(owner.address);
-        });
 
         it("should allow owner to add a new signer", async function () {
             await metaXSeed.addSigner(addr1.address);
@@ -58,7 +55,7 @@ describe("MetaXSeed Contract", function () {
             for (let i = 1; i <= 11; i++) {
                 await metaXSeed.safeMint(i, addr1.address, `uri${i}`, true);
             }
-            await expect(metaXSeed.safeMint(11, addr1.address, "uri11", true)).to.be.revertedWith("Max supply reached");
+            await expect(metaXSeed.safeMint(12, addr1.address, "uri11", true)).to.be.revertedWith("Max supply reached");
         });
 
         it("should fail to batch mint beyond max supply", async function () {

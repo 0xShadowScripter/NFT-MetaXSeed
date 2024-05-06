@@ -8,14 +8,14 @@ describe("MetaXSeed Contract Tests", function () {
     before(async function () {
         MetaXSeed = await ethers.getContractFactory("MetaXSeed");
         [owner, addr1, addr2, signer] = await ethers.getSigners();
-        metaXSeed = await MetaXSeed.deploy("MetaXSeed", "MTX", signer.address, owner.address, 10);
+        metaXSeed = await MetaXSeed.deploy("MetaXSeed", "MTX", signer.address, 10);
     });    
 
     describe("Lazy Minting", function () {
         it("should recognize an authorized signer", async function () {
             expect(await metaXSeed.signers(signer.address)).to.be.true;
         });
-        
+            
         it("should lazily mint a token with a valid signature", async function () {
 
 
@@ -78,8 +78,10 @@ describe("MetaXSeed Contract Tests", function () {
             console.log("initialSupply",initialSupply)
             console.log("finalSupply",finalSupply)
             expect(finalSupply.sub(initialSupply)).to.equal(1); // Here sub is a BigNumber method
-        });        
+        });
+               
     });
+
 });
 
 async function generateSignature(signer, data, contract) {
