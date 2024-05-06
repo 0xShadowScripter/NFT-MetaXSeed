@@ -10,6 +10,9 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 /// @title A contract for minting unique digital assets on the Ethereum blockchain
 /// @dev Extends ERC721URIStorage for token URI storage capabilities
 contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
+    //global token transferability
+    bool public globalTransferable;
+
     // Use library `Counters` for safe counter operations
     using Counters for Counters.Counter;
     // Use library `ECDSA` for operations on `bytes32` related to ECDSA signatures
@@ -20,7 +23,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
     /// @notice Maximum number of tokens that can be minted
     uint256 public maxSupply;
-    
+
     // Event for minting a new token
     event TokenMinted(
         address indexed owner,
@@ -69,14 +72,13 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         uint256[] expiries
     );
 
-      // Event for batch minting
+    // Event for batch minting
     event BatchMinted(
         address indexed to,
         uint256[] tokenIds,
         string[] tokenURIs,
         bool[] transferables
     );
-
 
     /// @dev Version of the EIP-712 domain
     string private constant SIGNATURE_VERSION = "1";
@@ -106,7 +108,6 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
     /// @dev to get owned Token
     mapping(address => uint256[]) private _ownedTokens;
-
 
     /// @notice Constructor to create MetaXSeed
     /// @param name Name of the token
@@ -139,6 +140,16 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         require(_signer != address(0), "Bad signer");
         delete signers[_signer];
         emit SignerRemoved(_signer);
+    }
+
+    /// @notice Sets the global transferability for all tokens
+    /// @dev Only callable by the owner of the contract
+    /// @param _globalTransferable Boolean indicating the global transferability status
+    function setGlobalTransferability(bool _globalTransferable)
+        public
+        onlyOwner
+    {
+        globalTransferable = _globalTransferable;
     }
 
     /// @notice Mints a new token with specific properties
@@ -240,15 +251,21 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         require(signers[signer], "Invalid signer");
         usedSalts[salt] = true;
 
-
         tokenIdCounter.increment();
         transferableTokens[tokenId] = transferable;
         _safeMint(to, tokenId); // mint to the specified 'to' address
         _setTokenURI(tokenId, tokenURI);
         _addTokenToOwnerEnumeration(to, tokenId);
-        
 
-       emit  LazyMinted(to, tokenId, transferable, salt, tokenURI, signature, expiry);
+        emit LazyMinted(
+            to,
+            tokenId,
+            transferable,
+            salt,
+            tokenURI,
+            signature,
+            expiry
+        );
     }
 
     /// @notice Lazily mints multiple tokens after verifying the signatures for each token
@@ -291,7 +308,15 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
             );
         }
 
-        emit BatchLazyMinted(to, tokenIds, tokenURIs, transferables, salts, signatures, expiries);
+        emit BatchLazyMinted(
+            to,
+            tokenIds,
+            tokenURIs,
+            transferables,
+            salts,
+            signatures,
+            expiries
+        );
     }
 
     /// @notice Burns a token and decrements the token counter
@@ -339,39 +364,43 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         emit TokenURIUpdated(tokenId, newTokenURI);
     }
 
-    /// @notice Sets the transferability status of a specific token
+    /// @notice Sets the transferability status for a range of tokens
     /// @dev Only callable by the owner of the contract
-    /// @param tokenId The ID of the token to update
-    /// @param transferable Boolean indicating whether the token can be transferred
-    function setTokenTransferability(uint256 tokenId, bool transferable)
-        public
-        onlyOwner
-    {
-        require(_exists(tokenId), "Token does not exist");
-        transferableTokens[tokenId] = transferable;
+    /// @param startTokenId The starting ID of the token range to update
+    /// @param endTokenId The ending ID of the token range to update
+    /// @param transferable Boolean indicating whether the tokens in the range can be transferred
+    function setTokenTransferabilityRange(
+        uint256 startTokenId,
+        uint256 endTokenId,
+        bool transferable
+    ) public onlyOwner {
+        require(startTokenId <= endTokenId, "Invalid token ID range");
+        for (uint256 tokenId = startTokenId; tokenId <= endTokenId; tokenId++) {
+            require(_exists(tokenId), "Token does not exist");
+            transferableTokens[tokenId] = transferable;
+            emit TokenTransferabilityUpdated(tokenId, transferable);
+        }
+    }
 
-        emit TokenTransferabilityUpdated(tokenId, transferable);
+    /// @notice Sets the transferability status for multiple tokens
+    /// @dev Only callable by the owner of the contract
+    /// @param tokenIds An array of token IDs to update
+    /// @param transferable Boolean indicating whether the tokens can be transferred
+    function setTokenTransferabilities(
+        uint256[] calldata tokenIds,
+        bool transferable
+    ) public onlyOwner {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            require(_exists(tokenIds[i]), "Token does not exist");
+            transferableTokens[tokenIds[i]] = transferable;
+            emit TokenTransferabilityUpdated(tokenIds[i], transferable);
+        }
     }
 
     /// @notice Retrieves the current total supply of tokens
     /// @return The total number of tokens minted so far
     function totalSupply() public view returns (uint256) {
         return tokenIdCounter.current();
-    }
-
-    /// @dev Overrides the ERC721 _transfer method to include a check for token transferability
-    /// @param from The address to transfer the token from
-    /// @param to The address to transfer the token to
-    /// @param tokenId The ID of the token to transfer
-    function _transfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal override {
-        require(transferableTokens[tokenId], "Token is not transferable");
-        super._transfer(from, to, tokenId);
-        _removeTokenFromOwnerEnumeration(from, tokenId);
-        _addTokenToOwnerEnumeration(to, tokenId);
     }
 
     /// @notice Verifies the signature of a minting request for migration purposes
@@ -420,6 +449,26 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         returns (uint256[] memory)
     {
         return _ownedTokens[owner];
+    }
+
+    /// @dev Overrides the ERC721 _transfer method to include a check for token transferability
+    /// @param from The address to transfer the token from
+    /// @param to The address to transfer the token to
+    /// @param tokenId The ID of the token to transfer
+    function _transfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override {
+        // Check global transferability or individual token transferability
+        require(
+            globalTransferable || transferableTokens[tokenId],
+            "Token is not transferable"
+        );
+
+        super._transfer(from, to, tokenId);
+        _removeTokenFromOwnerEnumeration(from, tokenId);
+        _addTokenToOwnerEnumeration(to, tokenId);
     }
 
     /// @dev Adds a token to the enumeration of owned tokens for a specific address

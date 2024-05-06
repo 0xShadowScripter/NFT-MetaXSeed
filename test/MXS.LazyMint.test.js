@@ -64,12 +64,6 @@ describe("MetaXSeed Contract Tests", function () {
     });
 
     describe("Transferability and Total Supply", function () {
-        it("should update transferability and check transfer fails when non-transferable", async function () {
-            await metaXSeed.safeMint(3, addr1.address, "https://example.com/token3", true);
-            await metaXSeed.setTokenTransferability(3, false);
-            await expect(metaXSeed.connect(addr1).transferFrom(addr1.address, addr2.address, 3))
-                .to.be.revertedWith("Token is not transferable");
-        });
 
         it("should correctly report total supply", async function () {
             const initialSupply = await metaXSeed.totalSupply();
