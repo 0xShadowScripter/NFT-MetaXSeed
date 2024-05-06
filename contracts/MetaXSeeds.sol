@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 /// @title A contract for minting unique digital assets on the Ethereum blockchain
 /// @dev Extends ERC721URIStorage for token URI storage capabilities
 contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
-    //global token transferability
+    // global token transferability
     bool public globalTransferable;
 
     // Use library `Counters` for safe counter operations
@@ -80,6 +80,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         bool[] transferables
     );
 
+
     /// @dev Version of the EIP-712 domain
     string private constant SIGNATURE_VERSION = "1";
 
@@ -108,6 +109,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
     /// @dev to get owned Token
     mapping(address => uint256[]) private _ownedTokens;
+
 
     /// @notice Constructor to create MetaXSeed
     /// @param name Name of the token
@@ -250,6 +252,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         require(signer != address(0), "Invalid signature");
         require(signers[signer], "Invalid signer");
         usedSalts[salt] = true;
+        
 
         tokenIdCounter.increment();
         transferableTokens[tokenId] = transferable;
