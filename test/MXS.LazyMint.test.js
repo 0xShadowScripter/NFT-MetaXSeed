@@ -67,7 +67,7 @@ describe("MetaXSeed Contract Tests", function () {
 
         it("should correctly report total supply", async function () {
             const initialSupply = await metaXSeed.totalSupply();
-            await metaXSeed.safeMint(4, addr1.address,"https://example.com/token4", true);
+            await metaXSeed.safeMint(addr1.address, 4,"https://example.com/token4", true);
             const finalSupply = await metaXSeed.totalSupply();
             console.log("initialSupply",initialSupply)
             console.log("finalSupply",finalSupply)

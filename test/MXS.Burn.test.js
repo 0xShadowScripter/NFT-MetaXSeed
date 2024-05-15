@@ -12,7 +12,7 @@ describe("MetaXSeed Contract - Burn Functionality", function () {
 
     it("should burn a token and decrement the token counter", async function () {
         // Mint a token first
-        await metaXSeed.safeMint(1, owner.address, "tokenURI1", true);
+        await metaXSeed.safeMint(owner.address, 1, "tokenURI1", true);
         expect(await metaXSeed.totalSupply()).to.equal(1);
     
         // Burn the token
@@ -25,7 +25,7 @@ describe("MetaXSeed Contract - Burn Functionality", function () {
 
     it("should prevent unauthorized users from burning a token", async function () {
         // Mint a token to the owner
-        await metaXSeed.safeMint(1, owner.address, "tokenURI1", true);
+        await metaXSeed.safeMint(owner.address, 1, "tokenURI1", true);
 
         // Attempt to burn the token from another address
         await expect(metaXSeed.connect(addr1).burn(1))

@@ -35,7 +35,7 @@ describe("MetaXSeed Contract", function () {
 
     describe("Minting Functionality Tests", function() {
         it("should mint a token", async function () {
-            await metaXSeed.safeMint(1, addr1.address, "tokenURI1", true);
+            await metaXSeed.safeMint(addr1.address, 1, "tokenURI1", true);
             expect(await metaXSeed.ownerOf(1)).to.equal(addr1.address);
             expect(await metaXSeed.transferableTokens(1)).to.be.true;
         });
@@ -52,15 +52,15 @@ describe("MetaXSeed Contract", function () {
         });
 
         it("should fail to mint beyond max supply", async function () {
-            for (let i = 1; i <= 11; i++) {
-                await metaXSeed.safeMint(i, addr1.address, `uri${i}`, true);
+            for (let i = 1; i <= 10; i++) {
+                await metaXSeed.safeMint(addr1.address, i, `uri${i}`, true);
             }
-            await expect(metaXSeed.safeMint(12, addr1.address, "uri11", true)).to.be.revertedWith("Max supply reached");
+            await expect(metaXSeed.safeMint(addr1.address, 12, "uri11", true)).to.be.revertedWith("Max supply reached");
         });
 
         it("should fail to batch mint beyond max supply", async function () {
             for (let i = 1; i <= 9; i++) {
-                await metaXSeed.safeMint(i, addr1.address, `uri${i}`, true);
+                await metaXSeed.safeMint(addr1.address, i, `uri${i}`, true);
             }
             const tokenIds = [11, 12]; // Attempting to mint three more should fail
             const tokenURIs = ["uri9", "uri9"];
@@ -74,7 +74,7 @@ describe("MetaXSeed Contract", function () {
           const initialURI = "https://example.com/original";
           const newURI = "https://example.com/updated";
   
-          await metaXSeed.safeMint(tokenId, owner.address, initialURI, true);
+          await metaXSeed.safeMint(owner.address, tokenId, initialURI, true);
           expect(await metaXSeed.tokenURI(tokenId)).to.equal(initialURI);
   
           await metaXSeed.setTokenURI(tokenId, newURI);
@@ -86,7 +86,7 @@ describe("MetaXSeed Contract", function () {
           const initialURI = "https://example.com/original";
           const newURI = "https://example.com/updated";
   
-          await metaXSeed.safeMint(tokenId, owner.address, initialURI, true);
+          await metaXSeed.safeMint(owner.address, tokenId, initialURI, true);
           await expect(metaXSeed.connect(addr1).setTokenURI(tokenId, newURI))
               .to.be.revertedWith("Ownable: caller is not the owner");
       });
