@@ -31,7 +31,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     uint32 private constant _WEEK = 3600 * 24 * 7;
 
     /// @dev Counter for tracking token IDs
-    Counters.Counter private tokenIdCounter;
+    Counters.Counter private _tokenIdCounter;
 
     /// @notice Maximum number of tokens that can be minted
     uint256 public maxSupply;
@@ -166,8 +166,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         bool transferable
     ) external onlyOwner {
         require(!_exists(tokenId), "Token ID already exists");
-        require(tokenIdCounter.current() < maxSupply, "Max supply reached");
-        tokenIdCounter.increment();
+        require(_tokenIdCounter.current() < maxSupply, "Max supply reached");
+        _tokenIdCounter.increment();
         transferableTokens[tokenId] = transferable;
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
@@ -195,7 +195,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
         // Ensure minting this batch won't exceed the max supply
         require(
-            tokenIdCounter.current() + tokenIds.length < maxSupply,
+            _tokenIdCounter.current() + tokenIds.length <= maxSupply,
             "Batch mint would exceed max supply"
         );
 
@@ -205,8 +205,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
             _safeMint(to, tokenIds[i]);
             _setTokenURI(tokenIds[i], tokenURIs[i]);
             _addTokenToOwnerEnumeration(to, tokenIds[i]);
-            // Manually increment the tokenIdCounter after each mint
-            tokenIdCounter.increment();
+            // Manually increment the _tokenIdCounter after each mint
+            _tokenIdCounter.increment();
         }
 
         emit BatchMinted(to, tokenIds, tokenURIs, transferables);
@@ -306,8 +306,8 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
         // Decrement the token counter if it's necessary for your logic (not standard in ERC721)
         // This assumes you want to keep track of the "active" supply, not just total minted ever
-        if (tokenIdCounter.current() > 0) {
-            tokenIdCounter.decrement();
+        if (_tokenIdCounter.current() > 0) {
+            _tokenIdCounter.decrement();
         }
 
         // Clean up any additional data related to the token
@@ -374,7 +374,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
     /// @notice Retrieves the current total supply of tokens
     /// @return The total number of tokens minted so far
     function totalSupply() external view returns (uint256) {
-        return tokenIdCounter.current();
+        return _tokenIdCounter.current();
     }
 
     /// @notice Verifies the signature of a minting request for migration purposes
@@ -464,7 +464,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
         uint256 expiry
     ) internal {
         require(!_exists(tokenId), "Token ID already exists"); // Checks if the token ID is already in use
-        require(tokenIdCounter.current() < maxSupply, "Max supply reached"); // Ensures the token count does not exceed the maximum supply
+        require(_tokenIdCounter.current() < maxSupply, "Max supply reached"); // Ensures the token count does not exceed the maximum supply
         require(
             expiry > block.timestamp && expiry <= block.timestamp + _WEEK,
             "Signature has expired"
@@ -488,7 +488,7 @@ contract MetaXSeed is ERC721URIStorage, EIP712, Ownable {
 
         usedSalts[salt] = true; // Marks the salt as used
 
-        tokenIdCounter.increment(); // Increments the token ID counter
+        _tokenIdCounter.increment(); // Increments the token ID counter
         transferableTokens[tokenId] = transferable; // Sets the transferability of the token
         _safeMint(to, tokenId); // Mints the token to the specified address
         _setTokenURI(tokenId, tokenURI); // Sets the token URI for metadata
